@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useCallback } from "react";
 import {
   Download,
   Copy,
@@ -8,6 +8,12 @@ import {
   ChevronDown,
   ChevronRight,
   FileText,
+  Rocket,
+  Loader2,
+  ExternalLink,
+  AlertCircle,
+  Key,
+  CheckCircle,
 } from "lucide-react";
 import { SDLC_PHASES } from "@/lib/sdlc-phases";
 import { PhaseResult } from "@/lib/types";
@@ -19,6 +25,13 @@ interface FinalOutputProps {
   onStartNew: () => void;
 }
 
+type DeployState = "idle" | "deploying" | "success" | "error";
+
+interface DeployFile {
+  path: string;
+  content: string;
+}
+
 export default function FinalOutput({
   phases,
   onDownload,
@@ -26,6 +39,23 @@ export default function FinalOutput({
 }: FinalOutputProps) {
   const [expandedPhases, setExpandedPhases] = useState<Set<string>>(new Set());
   const [copiedPhase, setCopiedPhase] = useState<string | null>(null);
+  const [deployState, setDeployState] = useState<DeployState>("idle");
+  const [deployUrl, setDeployUrl] = useState<string | null>(null);
+  const [deployError, setDeployError] = useState<string | null>(null);
+  const [hasVercelToken, setHasVercelToken] = useState(false);
+  const [vercelToken, setVercelToken] = useState("");
+  const [showTokenInput, setShowTokenInput] = useState(false);
+
+  useEffect(() => {
+    fetch("/api/config")
+      .then((res) => res.json())
+      .then((data: { hasApiKey: boolean; hasVercelToken: boolean }) => {
+        setHasVercelToken(data.hasVercelToken);
+      })
+      .catch(() => {
+        /* ignore */
+      });
+  }, []);
 
   const togglePhase = (phaseId: string) => {
     setExpandedPhases((prev) => {
@@ -45,6 +75,63 @@ export default function FinalOutput({
     setTimeout(() => setCopiedPhase(null), 2000);
   };
 
+  const extractFiles = useCallback((): DeployFile[] => {
+    const codePhase = phases.find((p) => p.phaseId === "code-generation");
+    if (!codePhase) return [];
+
+    const codeContent = codePhase.editedContent ?? codePhase.content;
+    const fileRegex = /### FILE: `(.+?)`\s*\n```[\w]*\n([\s\S]*?)```/g;
+    const files: DeployFile[] = [];
+    let match;
+    while ((match = fileRegex.exec(codeContent)) !== null) {
+      files.push({ path: match[1], content: match[2] });
+    }
+    return files;
+  }, [phases]);
+
+  const handleDeploy = useCallback(async () => {
+    const files = extractFiles();
+    if (files.length === 0) {
+      setDeployError(
+        "No code files found. The Code Generation phase needs to produce files in the format: ### FILE: `filename`"
+      );
+      setDeployState("error");
+      return;
+    }
+
+    setDeployState("deploying");
+    setDeployError(null);
+
+    try {
+      const response = await fetch("/api/deploy", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          files,
+          projectName: "sdlc-generated-app",
+          vercelToken: vercelToken || undefined,
+        }),
+      });
+
+      const data = (await response.json()) as {
+        url?: string;
+        error?: string;
+      };
+
+      if (!response.ok || data.error) {
+        setDeployError(data.error ?? "Deployment failed.");
+        setDeployState("error");
+        return;
+      }
+
+      setDeployUrl(data.url ?? null);
+      setDeployState("success");
+    } catch {
+      setDeployError("Failed to connect to the deployment server.");
+      setDeployState("error");
+    }
+  }, [extractFiles, vercelToken]);
+
   return (
     <div className="mx-auto w-full max-w-5xl">
       <div className="mb-8 text-center">
@@ -60,13 +147,29 @@ export default function FinalOutput({
         </p>
       </div>
 
-      <div className="mb-6 flex justify-center gap-4">
+      <div className="mb-6 flex flex-wrap justify-center gap-4">
         <button
           onClick={onDownload}
           className="inline-flex items-center gap-2 rounded-lg bg-indigo-600 px-6 py-3 text-sm font-medium text-white shadow-sm transition-colors hover:bg-indigo-700"
         >
           <Download className="h-4 w-4" />
           Download All as ZIP
+        </button>
+        <button
+          onClick={handleDeploy}
+          disabled={deployState === "deploying"}
+          className="inline-flex items-center gap-2 rounded-lg bg-green-600 px-6 py-3 text-sm font-medium text-white shadow-sm transition-colors hover:bg-green-700 disabled:cursor-not-allowed disabled:opacity-50"
+        >
+          {deployState === "deploying" ? (
+            <Loader2 className="h-4 w-4 animate-spin" />
+          ) : (
+            <Rocket className="h-4 w-4" />
+          )}
+          {deployState === "deploying"
+            ? "Deploying..."
+            : deployState === "success"
+              ? "Deployed!"
+              : "Deploy to Vercel"}
         </button>
         <button
           onClick={onStartNew}
@@ -76,6 +179,89 @@ export default function FinalOutput({
           Start New Project
         </button>
       </div>
+
+      {/* Vercel Token Section */}
+      <div className="mb-6 flex justify-center">
+        {hasVercelToken ? (
+          <div className="inline-flex items-center gap-1.5 rounded-lg border border-green-200 bg-green-50 px-3 py-2 text-sm font-medium text-green-700 dark:border-green-800 dark:bg-green-950/50 dark:text-green-400">
+            <CheckCircle className="h-4 w-4" />
+            Vercel token configured via environment
+          </div>
+        ) : (
+          <div className="text-center">
+            <button
+              onClick={() => setShowTokenInput(!showTokenInput)}
+              className="inline-flex items-center gap-1.5 text-sm font-medium text-zinc-600 hover:text-zinc-800 dark:text-zinc-400 dark:hover:text-zinc-200"
+            >
+              <Key className="h-4 w-4" />
+              {showTokenInput ? "Hide" : "Set"} Vercel Token
+            </button>
+            {showTokenInput && (
+              <div className="mt-2">
+                <input
+                  type="password"
+                  value={vercelToken}
+                  onChange={(e) => setVercelToken(e.target.value)}
+                  placeholder="Enter your Vercel API token..."
+                  className="w-80 rounded-lg border border-zinc-300 bg-zinc-50 px-4 py-2.5 text-sm text-zinc-900 placeholder:text-zinc-400 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500 dark:border-zinc-600 dark:bg-zinc-900 dark:text-zinc-100"
+                />
+                <p className="mt-1 text-xs text-zinc-400">
+                  Get a token at{" "}
+                  <a
+                    href="https://vercel.com/account/tokens"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-indigo-500 hover:underline"
+                  >
+                    vercel.com/account/tokens
+                  </a>
+                </p>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* Deploy Status */}
+      {deployState === "success" && deployUrl && (
+        <div className="mb-6 rounded-xl border border-green-200 bg-green-50 p-6 text-center dark:border-green-800 dark:bg-green-950/50">
+          <div className="mb-2 flex items-center justify-center gap-2 text-green-700 dark:text-green-400">
+            <Check className="h-5 w-5" />
+            <span className="text-lg font-semibold">
+              Deployed Successfully!
+            </span>
+          </div>
+          <a
+            href={deployUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-2 text-lg font-medium text-indigo-600 hover:underline dark:text-indigo-400"
+          >
+            {deployUrl}
+            <ExternalLink className="h-4 w-4" />
+          </a>
+          <p className="mt-2 text-sm text-green-600 dark:text-green-500">
+            Your application is live! It may take a few seconds for the
+            deployment to fully propagate.
+          </p>
+        </div>
+      )}
+
+      {deployState === "error" && deployError && (
+        <div className="mb-6 rounded-xl border border-red-200 bg-red-50 p-4 dark:border-red-800 dark:bg-red-950/50">
+          <div className="flex items-start gap-3">
+            <AlertCircle className="mt-0.5 h-5 w-5 shrink-0 text-red-600 dark:text-red-400" />
+            <div>
+              <p className="text-sm font-medium text-red-800 dark:text-red-300">
+                Deployment Failed
+              </p>
+              <p className="mt-1 text-sm text-red-700 dark:text-red-400">
+                {deployError}
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
 
       <div className="space-y-3">
         {phases.map((phaseResult) => {
