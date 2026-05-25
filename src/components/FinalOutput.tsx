@@ -14,6 +14,7 @@ import {
   AlertCircle,
   Key,
   CheckCircle,
+  Globe,
 } from "lucide-react";
 import { SDLC_PHASES } from "@/lib/sdlc-phases";
 import { PhaseResult } from "@/lib/types";
@@ -134,6 +135,14 @@ export default function FinalOutput({
 
   return (
     <div className="mx-auto w-full max-w-5xl">
+      {/* Step 8: Deployment Tag */}
+      <div className="mb-6 flex justify-center">
+        <div className="inline-flex items-center gap-2 rounded-full border border-indigo-200 bg-indigo-50 px-5 py-2 text-sm font-semibold text-indigo-700 dark:border-indigo-800 dark:bg-indigo-950/50 dark:text-indigo-400">
+          <Globe className="h-4 w-4" />
+          STEP 8 — Deployment
+        </div>
+      </div>
+
       <div className="mb-8 text-center">
         <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-green-100 dark:bg-green-900/30">
           <Check className="h-8 w-8 text-green-600 dark:text-green-400" />

@@ -12,6 +12,7 @@ import {
   Code,
   TestTube,
   Rocket,
+  Globe,
   ArrowRight,
 } from "lucide-react";
 
@@ -50,6 +51,11 @@ const STEPS = [
     icon: Rocket,
     title: "Deployment Plan",
     desc: "CI/CD pipeline, Docker config, and go-live checklist",
+  },
+  {
+    icon: Globe,
+    title: "Deployment",
+    desc: "Deploy your generated application live with one click",
   },
 ];
 
@@ -129,13 +135,13 @@ export default function HomePage() {
             <section className="px-4 pb-20 sm:px-6 lg:px-8">
               <div className="mx-auto max-w-5xl">
                 <h2 className="mb-4 text-center text-2xl font-bold text-zinc-900 dark:text-zinc-50">
-                  Complete SDLC in 7 Steps
+                  Complete SDLC in 8 Steps
                 </h2>
                 <p className="mb-12 text-center text-zinc-500 dark:text-zinc-400">
                   Each step produces detailed output that you can review, edit,
                   and approve before moving on.
                 </p>
-                <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
                   {STEPS.map((step, index) => (
                     <div
                       key={step.title}

@@ -21,23 +21,25 @@ export async function POST(request: Request): Promise<Response> {
     );
   }
 
+  const summarizePhase = (content: string, maxLen: number): string => {
+    if (content.length <= maxLen) return content;
+    return content.slice(0, maxLen) + "\n\n[...truncated for brevity]";
+  };
+
+  const reqSummary =
+    requirementDocument.length > 1500
+      ? requirementDocument.slice(0, 1500) + "\n\n[...truncated]"
+      : requirementDocument;
+
   const previousContext = previousPhases
     .map((p) => {
       const phaseDef = SDLC_PHASES.find((def) => def.id === p.phaseId);
       const content = p.editedContent || p.content;
-      return `## ${phaseDef?.name ?? p.phaseId}\n\n${content}`;
+      return `## ${phaseDef?.name ?? p.phaseId}\n${summarizePhase(content, 800)}`;
     })
-    .join("\n\n---\n\n");
+    .join("\n\n");
 
-  const userMessage = `# Requirement Document
-
-${requirementDocument}
-
-${previousContext ? `# Previous SDLC Phase Outputs\n\n${previousContext}` : ""}
-
-# Current Task
-
-${phase.prompt}`;
+  const userMessage = `# Requirements\n${reqSummary}\n\n${previousContext ? `# Previous Phases\n${previousContext}` : ""}\n\n# Task\n${phase.prompt}`;
 
   try {
     const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
@@ -52,12 +54,12 @@ ${phase.prompt}`;
           {
             role: "system",
             content:
-              "You are an expert software engineer following the SDLC process. Provide detailed, professional, production-quality output for each phase. Use clean Markdown formatting.",
+              "Expert software engineer. Output concise, production-quality Markdown. No filler or preamble.",
           },
           { role: "user", content: userMessage },
         ],
-        max_tokens: 8000,
-        temperature: 0.3,
+        max_tokens: 3000,
+        temperature: 0.2,
       }),
     });
 
