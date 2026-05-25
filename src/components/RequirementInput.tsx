@@ -97,7 +97,7 @@ The platform should handle 10,000 concurrent users and comply with GDPR...`}
             className="mb-2 inline-flex items-center gap-1.5 text-sm font-medium text-zinc-600 hover:text-zinc-800 dark:text-zinc-400 dark:hover:text-zinc-200"
           >
             <Key className="h-4 w-4" />
-            {showApiKey ? "Hide" : "Set"} OpenAI API Key
+            {showApiKey ? "Hide" : "Set"} Groq API Key
           </button>
           {showApiKey && (
             <div>
@@ -105,11 +105,11 @@ The platform should handle 10,000 concurrent users and comply with GDPR...`}
                 type="password"
                 value={apiKey}
                 onChange={(e) => setApiKey(e.target.value)}
-                placeholder="sk-..."
+                placeholder="gsk_..."
                 className="w-full rounded-lg border border-zinc-300 bg-zinc-50 px-4 py-2.5 text-sm text-zinc-900 placeholder:text-zinc-400 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500 dark:border-zinc-600 dark:bg-zinc-900 dark:text-zinc-100"
               />
               <p className="mt-1 text-xs text-zinc-400">
-                Your key is sent only to OpenAI and is never stored on our servers.
+                Your key is sent only to Groq and is never stored on our servers.
               </p>
             </div>
           )}

@@ -5,10 +5,10 @@ export async function POST(request: Request): Promise<Response> {
   const body = (await request.json()) as SDLCRequest;
   const { phaseId, requirementDocument, previousPhases, apiKey } = body;
 
-  const key = apiKey || process.env.OPENAI_API_KEY;
+  const key = apiKey || process.env.GROQ_API_KEY;
   if (!key) {
     return Response.json(
-      { content: "", error: "OpenAI API key is required." } satisfies SDLCResponse,
+      { content: "", error: "Groq API key is required." } satisfies SDLCResponse,
       { status: 400 }
     );
   }
@@ -40,14 +40,14 @@ ${previousContext ? `# Previous SDLC Phase Outputs\n\n${previousContext}` : ""}
 ${phase.prompt}`;
 
   try {
-    const response = await fetch("https://api.openai.com/v1/chat/completions", {
+    const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
         Authorization: `Bearer ${key}`,
       },
       body: JSON.stringify({
-        model: "gpt-4o",
+        model: "llama-3.3-70b-versatile",
         messages: [
           {
             role: "system",
@@ -56,7 +56,7 @@ ${phase.prompt}`;
           },
           { role: "user", content: userMessage },
         ],
-        max_tokens: 16000,
+        max_tokens: 8000,
         temperature: 0.3,
       }),
     });
@@ -65,7 +65,7 @@ ${phase.prompt}`;
       const errorData = (await response.json().catch(() => ({}))) as Record<string, unknown>;
       const errorMessage =
         (errorData.error as Record<string, string>)?.message ??
-        `OpenAI API error: ${response.status}`;
+        `Groq API error: ${response.status}`;
       return Response.json(
         { content: "", error: errorMessage } satisfies SDLCResponse,
         { status: response.status }
