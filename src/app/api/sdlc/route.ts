@@ -21,25 +21,22 @@ export async function POST(request: Request): Promise<Response> {
     );
   }
 
-  const summarizePhase = (content: string, maxLen: number): string => {
-    if (content.length <= maxLen) return content;
-    return content.slice(0, maxLen) + "\n\n[...truncated for brevity]";
-  };
-
   const reqSummary =
-    requirementDocument.length > 1500
-      ? requirementDocument.slice(0, 1500) + "\n\n[...truncated]"
+    requirementDocument.length > 800
+      ? requirementDocument.slice(0, 800) + "..."
       : requirementDocument;
 
-  const previousContext = previousPhases
-    .map((p) => {
-      const phaseDef = SDLC_PHASES.find((def) => def.id === p.phaseId);
-      const content = p.editedContent || p.content;
-      return `## ${phaseDef?.name ?? p.phaseId}\n${summarizePhase(content, 800)}`;
-    })
-    .join("\n\n");
+  // Only send the last phase output as context (not all previous phases)
+  const lastPhase = previousPhases.length > 0 ? previousPhases[previousPhases.length - 1] : null;
+  let previousContext = "";
+  if (lastPhase) {
+    const lastDef = SDLC_PHASES.find((def) => def.id === lastPhase.phaseId);
+    const lastContent = lastPhase.editedContent || lastPhase.content;
+    const trimmed = lastContent.length > 600 ? lastContent.slice(0, 600) + "..." : lastContent;
+    previousContext = `## ${lastDef?.name ?? lastPhase.phaseId}\n${trimmed}`;
+  }
 
-  const userMessage = `# Requirements\n${reqSummary}\n\n${previousContext ? `# Previous Phases\n${previousContext}` : ""}\n\n# Task\n${phase.prompt}`;
+  const userMessage = `${reqSummary}\n\n${previousContext ? `${previousContext}\n\n` : ""}${phase.prompt}`;
 
   try {
     const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
@@ -49,16 +46,15 @@ export async function POST(request: Request): Promise<Response> {
         Authorization: `Bearer ${key}`,
       },
       body: JSON.stringify({
-        model: "llama-3.3-70b-versatile",
+        model: "llama-3.1-8b-instant",
         messages: [
           {
             role: "system",
-            content:
-              "Expert software engineer. Output concise, production-quality Markdown. No filler or preamble.",
+            content: "Concise Markdown output. No filler.",
           },
           { role: "user", content: userMessage },
         ],
-        max_tokens: 3000,
+        max_tokens: 2000,
         temperature: 0.2,
       }),
     });
