@@ -33,6 +33,33 @@ interface DeployFile {
   content: string;
 }
 
+function closeHtmlIfTruncated(html: string): string {
+  // Remove trailing incomplete tags/code
+  let cleaned = html.replace(/```\s*$/, "").trimEnd();
+
+  // If truncated mid-tag, remove the partial tag
+  const lastOpenBracket = cleaned.lastIndexOf("<");
+  const lastCloseBracket = cleaned.lastIndexOf(">");
+  if (lastOpenBracket > lastCloseBracket) {
+    cleaned = cleaned.slice(0, lastOpenBracket).trimEnd();
+  }
+
+  // Close unclosed script/style tags
+  if (cleaned.includes("<script") && !cleaned.includes("</script>")) {
+    cleaned += "\n</script>";
+  }
+  if (cleaned.includes("<style") && !cleaned.includes("</style>")) {
+    cleaned += "\n</style>";
+  }
+  if (!cleaned.includes("</body>")) {
+    cleaned += "\n</body>";
+  }
+  if (!cleaned.includes("</html>")) {
+    cleaned += "\n</html>";
+  }
+  return cleaned;
+}
+
 export default function FinalOutput({
   phases,
   onDownload,
@@ -81,12 +108,48 @@ export default function FinalOutput({
     if (!codePhase) return [];
 
     const codeContent = codePhase.editedContent ?? codePhase.content;
-    const fileRegex = /### FILE: `(.+?)`\s*\n```[\w]*\n([\s\S]*?)```/g;
     const files: DeployFile[] = [];
+
+    // Strategy 1: Try ### FILE: `path` format (with or without closing ```)
+    const fileRegex = /###\s*FILE:\s*`(.+?)`\s*\n```[\w]*\n([\s\S]*?)(?:```|$)/g;
     let match;
     while ((match = fileRegex.exec(codeContent)) !== null) {
-      files.push({ path: match[1], content: match[2] });
+      const content = match[2].trim();
+      if (content.length > 0) {
+        files.push({ path: match[1], content });
+      }
     }
+
+    if (files.length > 0) return files;
+
+    // Strategy 2: Try any ```html code block
+    const htmlBlockRegex = /```html\s*\n([\s\S]*?)(?:```|$)/g;
+    while ((match = htmlBlockRegex.exec(codeContent)) !== null) {
+      const content = match[1].trim();
+      if (content.length > 50 && content.includes("<")) {
+        files.push({ path: "index.html", content: closeHtmlIfTruncated(content) });
+        return files;
+      }
+    }
+
+    // Strategy 3: Try any code block at all
+    const anyBlockRegex = /```\w*\s*\n([\s\S]*?)(?:```|$)/g;
+    while ((match = anyBlockRegex.exec(codeContent)) !== null) {
+      const content = match[1].trim();
+      if (content.length > 100 && (content.includes("<!DOCTYPE") || content.includes("<html"))) {
+        files.push({ path: "index.html", content: closeHtmlIfTruncated(content) });
+        return files;
+      }
+    }
+
+    // Strategy 4: Look for raw HTML in the content itself
+    const htmlMatch = codeContent.match(/(<!DOCTYPE[\s\S]*$)/i) ??
+                      codeContent.match(/(<html[\s\S]*$)/i);
+    if (htmlMatch && htmlMatch[1].length > 100) {
+      files.push({ path: "index.html", content: closeHtmlIfTruncated(htmlMatch[1]) });
+      return files;
+    }
+
     return files;
   }, [phases]);
 

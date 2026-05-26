@@ -48,6 +48,15 @@ export async function POST(request: Request): Promise<Response> {
     );
   }
 
+  // Validate files have actual content
+  const totalContent = files.reduce((sum, f) => sum + f.content.trim().length, 0);
+  if (totalContent < 50) {
+    return Response.json(
+      { error: "Generated code is empty or too short. Please regenerate the Code Generation phase and try again." },
+      { status: 400 }
+    );
+  }
+
   const sanitizedName = projectName
     .toLowerCase()
     .replace(/[^a-z0-9-]/g, "-")

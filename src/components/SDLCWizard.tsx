@@ -132,12 +132,21 @@ export default function SDLCWizard({
       const codeContent = codePhase.editedContent ?? codePhase.content;
       const codeFolder = zip.folder("generated-code");
       if (codeFolder) {
-        const fileRegex = /### FILE: `(.+?)`\s*\n```[\w]*\n([\s\S]*?)```/g;
+        // Try ### FILE: `path` format (with or without closing ```)
+        const fileRegex = /###\s*FILE:\s*`(.+?)`\s*\n```[\w]*\n([\s\S]*?)(?:```|$)/g;
         let match;
+        let found = false;
         while ((match = fileRegex.exec(codeContent)) !== null) {
-          const filePath = match[1];
-          const fileContent = match[2];
-          codeFolder.file(filePath, fileContent);
+          codeFolder.file(match[1], match[2].trim());
+          found = true;
+        }
+        // Fallback: extract any HTML code block
+        if (!found) {
+          const htmlBlock = /```html\s*\n([\s\S]*?)(?:```|$)/;
+          const htmlMatch = codeContent.match(htmlBlock);
+          if (htmlMatch && htmlMatch[1].trim().length > 50) {
+            codeFolder.file("index.html", htmlMatch[1].trim());
+          }
         }
       }
     }
