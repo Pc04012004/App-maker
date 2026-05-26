@@ -101,8 +101,33 @@ export async function POST(request: Request): Promise<Response> {
 
     const data = (await response.json()) as {
       choices: { message: { content: string } }[];
+      usage?: { completion_tokens: number; total_tokens: number };
     };
-    const content = data.choices[0]?.message?.content ?? "";
+    let content = data.choices[0]?.message?.content ?? "";
+
+    if (!content || content.trim().length === 0) {
+      return Response.json(
+        { content: "", error: "AI returned empty output. Please try regenerating." } satisfies SDLCResponse,
+        { status: 500 }
+      );
+    }
+
+    // For code generation: validate that actual code was produced
+    if (phaseId === "code-generation") {
+      const hasCode = content.includes("```") || content.includes("<!DOCTYPE") || content.includes("<html");
+      if (!hasCode) {
+        return Response.json(
+          { content: "", error: "Code generation failed to produce code. Please try regenerating." } satisfies SDLCResponse,
+          { status: 500 }
+        );
+      }
+
+      // If output was truncated (hit token limit mid-HTML), try to close tags
+      const hitLimit = data.usage && data.usage.completion_tokens >= (maxTokens - 10);
+      if (hitLimit && content.includes("<html") && !content.includes("</html>")) {
+        content = repairTruncatedHtml(content);
+      }
+    }
 
     return Response.json({ content } satisfies SDLCResponse);
   } catch (err) {
@@ -112,4 +137,39 @@ export async function POST(request: Request): Promise<Response> {
       { status: 500 }
     );
   }
+}
+
+function repairTruncatedHtml(content: string): string {
+  let repaired = content;
+
+  // Remove trailing partial tag
+  const lastOpen = repaired.lastIndexOf("<");
+  const lastClose = repaired.lastIndexOf(">");
+  if (lastOpen > lastClose) {
+    repaired = repaired.slice(0, lastOpen).trimEnd();
+  }
+
+  // Remove trailing incomplete code fence
+  repaired = repaired.replace(/```\s*$/, "").trimEnd();
+
+  // Close unclosed tags
+  if (repaired.includes("<script") && !repaired.includes("</script>")) {
+    repaired += "\n</script>";
+  }
+  if (repaired.includes("<style") && !repaired.includes("</style>")) {
+    repaired += "\n</style>";
+  }
+  if (!repaired.includes("</body>")) {
+    repaired += "\n</body>";
+  }
+  if (!repaired.includes("</html>")) {
+    repaired += "\n</html>";
+  }
+
+  // Re-add code fence if it was in a code block
+  if (!repaired.endsWith("```")) {
+    repaired += "\n```";
+  }
+
+  return repaired;
 }
