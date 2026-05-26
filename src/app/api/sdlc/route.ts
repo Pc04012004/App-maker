@@ -65,9 +65,9 @@ export async function POST(request: Request): Promise<Response> {
   }
 
   const model = isHeavyPhase ? "llama-3.3-70b-versatile" : "llama-3.1-8b-instant";
-  const maxTokens = isHeavyPhase ? 4000 : 2000;
+  const maxTokens = phaseId === "code-generation" ? 6000 : isHeavyPhase ? 3000 : 2000;
   const systemPrompt = isHeavyPhase
-    ? "You are an expert full-stack developer. Generate COMPLETE, WORKING code that exactly implements the user's requirements. Every file must be functional — no placeholders, no TODOs, no stubs. The output must form a fully working application when all files are combined."
+    ? "You are an expert full-stack developer who creates BEAUTIFUL, polished applications. Generate a COMPLETE, WORKING application as a single index.html file with embedded CSS and JavaScript. The UI must be visually stunning with modern design (gradients, shadows, animations, professional colors). Every feature must be fully implemented — no placeholders, no TODOs. The code must work immediately when opened in a browser."
     : "Concise Markdown output. No filler.";
 
   try {
