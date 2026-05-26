@@ -7,11 +7,13 @@ export const SDLC_PHASES: SDLCPhase[] = [
     description:
       "Analyze the requirement document, extract functional and non-functional requirements, identify stakeholders, and define scope.",
     icon: "ClipboardList",
-    prompt: `Analyze requirements. Markdown:
-- **Overview** (2 sentences)
-- **Functional Reqs** (FR-001 etc.)
-- **Non-Functional Reqs** (NFR-001 etc.)
-- **Scope & Priorities**`,
+    prompt: `Analyze the requirement document thoroughly. Markdown output:
+- **Project Overview** (what exactly needs to be built)
+- **Functional Requirements** (numbered FR-001 etc. — be specific to the user's request)
+- **Non-Functional Requirements** (NFR-001 etc.)
+- **Scope** (in/out)
+- **User Stories** (As a user, I want... so that...)
+- **Priority** (MoSCoW)`,
   },
   {
     id: "system-design",
@@ -19,11 +21,12 @@ export const SDLC_PHASES: SDLCPhase[] = [
     description:
       "Create high-level system design including system architecture, data flow diagrams, and component interactions.",
     icon: "Layout",
-    prompt: `System design. Markdown:
-- **Architecture** (pattern + justification)
-- **Components** (name: responsibility)
-- **API Endpoints** (table: method, path, purpose)
-- **DB Schema** (tables + key fields)`,
+    prompt: `Design the system to exactly match the user's requirements. Markdown:
+- **Architecture** (pattern + justification for THIS specific app)
+- **Components** (each component mapped to a specific user requirement)
+- **API Endpoints** (table: method, path, request/response — specific to this app)
+- **Data Model** (entities, fields, relationships — specific to this app)
+- **UI Screens** (list each screen/page the user will see, what it contains)`,
   },
   {
     id: "tech-architecture",
@@ -31,10 +34,13 @@ export const SDLC_PHASES: SDLCPhase[] = [
     description:
       "Define the technology stack, frameworks, tools, and infrastructure needed for the project.",
     icon: "Cpu",
-    prompt: `Tech architecture. Markdown:
-- **Stack** (frontend, backend, DB, infra)
-- **Project Structure** (folder tree)
-- **Dev Tools** (CI/CD, testing)`,
+    prompt: `Define tech architecture. Choose the simplest stack that works. Markdown:
+- **Stack** (prefer: HTML/CSS/JS for simple apps, React for SPAs, Next.js only if needed)
+- **Project Structure** (complete folder tree with every file)
+- **Dependencies** (exact package names and versions)
+- **How to Run** (exact commands)
+
+IMPORTANT: For games or simple interactive apps, prefer vanilla HTML/CSS/JavaScript (single file if possible). Only use frameworks when genuinely needed.`,
   },
   {
     id: "implementation-plan",
@@ -43,8 +49,9 @@ export const SDLC_PHASES: SDLCPhase[] = [
       "Break down the project into sprints, tasks, and milestones with time estimates.",
     icon: "ListTodo",
     prompt: `Implementation plan. Markdown:
-- **Sprints** (table: task, hours, role)
-- **Milestones** (name + date)`,
+- **Tasks** (table: ID, task, description, hours)
+- **Build Order** (what to implement first, second, etc.)
+- **Key Logic** (describe the core algorithm/game logic/business logic in detail)`,
   },
   {
     id: "code-generation",
@@ -52,14 +59,24 @@ export const SDLC_PHASES: SDLCPhase[] = [
     description:
       "Generate the actual application code based on all previous phases.",
     icon: "Code",
-    prompt: `Generate code. Format per file:
+    prompt: `Generate a COMPLETE, FULLY WORKING application that exactly matches the user's requirements.
+
+CRITICAL RULES:
+1. Every file must be complete — NO placeholders, NO "// TODO", NO "// add more here"
+2. The app must work immediately when files are saved and opened/run
+3. For web apps: generate a single index.html with embedded CSS and JS if possible
+4. For games: implement ALL game mechanics described in the requirements (controls, scoring, win/lose conditions, graphics)
+5. Include ALL features the user asked for — don't skip anything
+6. Make it visually polished with proper styling
+
+Format each file as:
 
 ### FILE: \`path/to/file\`
 \`\`\`lang
-code
+complete working code
 \`\`\`
 
-Include config, entry points, models, routes, UI. No explanations.`,
+Generate EVERY file needed. The code must be production-quality and fully functional.`,
   },
   {
     id: "testing-strategy",
@@ -67,14 +84,10 @@ Include config, entry points, models, routes, UI. No explanations.`,
     description:
       "Define testing strategy, create test cases, and generate test code.",
     icon: "TestTube",
-    prompt: `Testing strategy. Markdown:
-- **Test Cases** (table: ID, description, priority)
-- **Test Code** per file:
-
-### FILE: \`path/to/test\`
-\`\`\`lang
-test code
-\`\`\``,
+    prompt: `Testing strategy for this specific application. Markdown:
+- **Test Cases** (table: ID, what to test, expected result, priority)
+- **Manual Test Steps** (step-by-step how to verify the app works correctly)
+- **Edge Cases** (what could go wrong, how the app should handle it)`,
   },
   {
     id: "deployment-plan",
@@ -83,15 +96,8 @@ test code
       "Create deployment strategy, infrastructure setup, and go-live checklist.",
     icon: "Rocket",
     prompt: `Deployment plan. Markdown:
-- **Strategy** (pick one, brief)
-- **CI/CD**:
-
-### FILE: \`Dockerfile\`
-\`\`\`dockerfile
-config
-\`\`\`
-
-- **Go-Live Checklist**
-- **Rollback Plan**`,
+- **How to Deploy** (exact steps for this specific app)
+- **Go-Live Checklist** (numbered steps)
+- **Environment Variables** (if any needed)`,
   },
 ];
