@@ -23,6 +23,12 @@ interface VercelDeployResponse {
   error?: { code: string; message: string };
 }
 
+interface VercelDeploymentStatus {
+  readyState: string;
+  url: string;
+  error?: { code: string; message: string };
+}
+
 export async function POST(request: Request): Promise<Response> {
   const body = (await request.json()) as DeployRequest;
   const { files, projectName, vercelToken } = body;
@@ -49,22 +55,37 @@ export async function POST(request: Request): Promise<Response> {
     .replace(/^-|-$/g, "")
     .slice(0, 52) || "sdlc-app";
 
-  const vercelFiles: VercelFileEntry[] = files.map((f) => ({
+  // Normalize file paths and prepare for static deployment
+  const normalizedFiles = normalizeFilePaths(files);
+  const vercelFiles: VercelFileEntry[] = normalizedFiles.map((f) => ({
     file: f.path,
     data: f.content,
     encoding: "utf-8" as const,
   }));
 
-  const hasHtml = files.some(
-    (f) => f.path.endsWith(".html") || f.path === "index.html"
+  // Ensure there's always an index.html at root
+  const hasRootHtml = normalizedFiles.some(
+    (f) => f.path === "index.html"
   );
 
-  if (!hasHtml) {
-    vercelFiles.push({
-      file: "index.html",
-      data: generateIndexHtml(files),
-      encoding: "utf-8",
-    });
+  if (!hasRootHtml) {
+    // Try to find any HTML file and use it as index
+    const anyHtml = normalizedFiles.find((f) => f.path.endsWith(".html"));
+    if (anyHtml) {
+      vercelFiles.push({
+        file: "index.html",
+        data: anyHtml.content,
+        encoding: "utf-8",
+      });
+    } else {
+      // No HTML at all — wrap everything into a single index.html
+      vercelFiles.length = 0;
+      vercelFiles.push({
+        file: "index.html",
+        data: bundleAsHtml(normalizedFiles),
+        encoding: "utf-8",
+      });
+    }
   }
 
   try {
@@ -79,7 +100,10 @@ export async function POST(request: Request): Promise<Response> {
         files: vercelFiles,
         projectSettings: {
           framework: null,
+          buildCommand: "",
+          outputDirectory: "",
         },
+        target: "production",
       }),
     });
 
@@ -91,12 +115,14 @@ export async function POST(request: Request): Promise<Response> {
       return Response.json({ error: errorMessage }, { status: response.status });
     }
 
+    // Poll until deployment is ready (max 60 seconds)
     const deployUrl = `https://${data.url}`;
+    const readyUrl = await waitForDeployment(data.id, token, 60);
 
     return Response.json({
-      url: deployUrl,
+      url: readyUrl ?? deployUrl,
       deploymentId: data.id,
-      readyState: data.readyState,
+      readyState: readyUrl ? "READY" : data.readyState,
     });
   } catch (err) {
     const message = err instanceof Error ? err.message : "Unknown error";
@@ -104,68 +130,79 @@ export async function POST(request: Request): Promise<Response> {
   }
 }
 
-function generateIndexHtml(files: DeployFile[]): string {
-  const fileLinks = files
-    .map((f) => {
-      const ext = f.path.split(".").pop() ?? "";
-      const icon = getFileIcon(ext);
-      return `<li><span class="icon">${icon}</span><a href="/${f.path}">${f.path}</a></li>`;
-    })
-    .join("\n        ");
+function normalizeFilePaths(files: DeployFile[]): DeployFile[] {
+  return files.map((f) => {
+    let path = f.path;
+    // Strip leading ./ or /
+    path = path.replace(/^\.?\//, "");
+    // If path starts with src/ or public/, flatten it
+    path = path.replace(/^(src|public)\//, "");
+    return { path, content: f.content };
+  });
+}
+
+function bundleAsHtml(files: DeployFile[]): string {
+  // Collect CSS files
+  const cssFiles = files.filter((f) => f.path.endsWith(".css"));
+  const cssContent = cssFiles.map((f) => f.content).join("\n");
+
+  // Collect JS files
+  const jsFiles = files.filter(
+    (f) => f.path.endsWith(".js") || f.path.endsWith(".ts")
+  );
+  const jsContent = jsFiles.map((f) => f.content).join("\n\n");
 
   return `<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Generated Application — SDLCFlow</title>
+  <title>Generated Application</title>
   <style>
-    * { margin: 0; padding: 0; box-sizing: border-box; }
-    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f8fafc; color: #1e293b; padding: 2rem; }
-    .container { max-width: 800px; margin: 0 auto; }
-    h1 { font-size: 1.5rem; margin-bottom: 0.5rem; }
-    .subtitle { color: #64748b; margin-bottom: 2rem; font-size: 0.875rem; }
-    .badge { display: inline-block; background: #e0e7ff; color: #4338ca; padding: 0.25rem 0.75rem; border-radius: 9999px; font-size: 0.75rem; font-weight: 600; margin-bottom: 1.5rem; }
-    ul { list-style: none; }
-    li { padding: 0.75rem 1rem; border: 1px solid #e2e8f0; border-radius: 0.5rem; margin-bottom: 0.5rem; background: white; display: flex; align-items: center; gap: 0.75rem; }
-    li:hover { border-color: #818cf8; }
-    a { color: #4338ca; text-decoration: none; font-weight: 500; }
-    a:hover { text-decoration: underline; }
-    .icon { font-size: 1.25rem; }
+${cssContent || "body { font-family: system-ui, sans-serif; margin: 0; padding: 2rem; }"}
   </style>
 </head>
 <body>
-  <div class="container">
-    <div class="badge">Generated by SDLCFlow</div>
-    <h1>Your Application Files</h1>
-    <p class="subtitle">${files.length} files generated via the SDLC process</p>
-    <ul>
-        ${fileLinks}
-    </ul>
-  </div>
+  <div id="app"></div>
+  <script>
+${jsContent}
+  </script>
 </body>
 </html>`;
 }
 
-function getFileIcon(ext: string): string {
-  const icons: Record<string, string> = {
-    html: "🌐",
-    css: "🎨",
-    js: "📜",
-    ts: "📘",
-    tsx: "⚛️",
-    jsx: "⚛️",
-    json: "📋",
-    md: "📝",
-    py: "🐍",
-    java: "☕",
-    go: "🔵",
-    rs: "🦀",
-    sql: "🗄️",
-    yml: "⚙️",
-    yaml: "⚙️",
-    dockerfile: "🐳",
-    sh: "🖥️",
-  };
-  return icons[ext.toLowerCase()] ?? "📄";
+async function waitForDeployment(
+  deploymentId: string,
+  token: string,
+  maxSeconds: number
+): Promise<string | null> {
+  const start = Date.now();
+  const maxMs = maxSeconds * 1000;
+
+  while (Date.now() - start < maxMs) {
+    try {
+      const res = await fetch(
+        `https://api.vercel.com/v13/deployments/${deploymentId}`,
+        {
+          headers: { Authorization: `Bearer ${token}` },
+        }
+      );
+
+      if (res.ok) {
+        const data = (await res.json()) as VercelDeploymentStatus;
+        if (data.readyState === "READY") {
+          return `https://${data.url}`;
+        }
+        if (data.readyState === "ERROR") {
+          return null;
+        }
+      }
+    } catch {
+      // ignore polling errors
+    }
+
+    await new Promise((resolve) => setTimeout(resolve, 3000));
+  }
+
+  return null;
 }
