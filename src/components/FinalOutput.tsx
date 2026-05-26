@@ -15,9 +15,11 @@ import {
   Key,
   CheckCircle,
   Globe,
+  Eye,
 } from "lucide-react";
 import { SDLC_PHASES } from "@/lib/sdlc-phases";
 import { PhaseResult } from "@/lib/types";
+import { extractFilesFromContent } from "@/lib/file-extraction";
 import MarkdownRenderer from "./MarkdownRenderer";
 
 interface FinalOutputProps {
@@ -46,6 +48,7 @@ export default function FinalOutput({
   const [hasVercelToken, setHasVercelToken] = useState(false);
   const [vercelToken, setVercelToken] = useState("");
   const [showTokenInput, setShowTokenInput] = useState(false);
+  const [showPreview, setShowPreview] = useState(false);
 
   useEffect(() => {
     fetch("/api/config")
@@ -57,6 +60,17 @@ export default function FinalOutput({
         /* ignore */
       });
   }, []);
+
+  const previewHtml = (() => {
+    const codePhase = phases.find((p) => p.phaseId === "code-generation");
+    if (!codePhase) return null;
+    const content = codePhase.editedContent ?? codePhase.content;
+    const files = extractFilesFromContent(content);
+    const indexFile = files.find(
+      (f) => f.path === "index.html" || f.path.endsWith(".html")
+    );
+    return indexFile?.content ?? null;
+  })();
 
   const togglePhase = (phaseId: string) => {
     setExpandedPhases((prev) => {
@@ -81,20 +95,15 @@ export default function FinalOutput({
     if (!codePhase) return [];
 
     const codeContent = codePhase.editedContent ?? codePhase.content;
-    const fileRegex = /### FILE: `(.+?)`\s*\n```[\w]*\n([\s\S]*?)```/g;
-    const files: DeployFile[] = [];
-    let match;
-    while ((match = fileRegex.exec(codeContent)) !== null) {
-      files.push({ path: match[1], content: match[2] });
-    }
-    return files;
+    const extracted = extractFilesFromContent(codeContent);
+    return extracted.map((f) => ({ path: f.path, content: f.content }));
   }, [phases]);
 
   const handleDeploy = useCallback(async () => {
     const files = extractFiles();
     if (files.length === 0) {
       setDeployError(
-        "No code files found. The Code Generation phase needs to produce files in the format: ### FILE: `filename`"
+        "No code files found. Please regenerate the Code Generation phase."
       );
       setDeployState("error");
       return;
@@ -135,7 +144,6 @@ export default function FinalOutput({
 
   return (
     <div className="mx-auto w-full max-w-5xl">
-      {/* Step 8: Deployment Tag */}
       <div className="mb-6 flex justify-center">
         <div className="inline-flex items-center gap-2 rounded-full border border-indigo-200 bg-indigo-50 px-5 py-2 text-sm font-semibold text-indigo-700 dark:border-indigo-800 dark:bg-indigo-950/50 dark:text-indigo-400">
           <Globe className="h-4 w-4" />
@@ -157,6 +165,15 @@ export default function FinalOutput({
       </div>
 
       <div className="mb-6 flex flex-wrap justify-center gap-4">
+        {previewHtml && (
+          <button
+            onClick={() => setShowPreview(!showPreview)}
+            className="inline-flex items-center gap-2 rounded-lg bg-purple-600 px-6 py-3 text-sm font-medium text-white shadow-sm transition-colors hover:bg-purple-700"
+          >
+            <Eye className="h-4 w-4" />
+            {showPreview ? "Hide Preview" : "Preview App"}
+          </button>
+        )}
         <button
           onClick={onDownload}
           className="inline-flex items-center gap-2 rounded-lg bg-indigo-600 px-6 py-3 text-sm font-medium text-white shadow-sm transition-colors hover:bg-indigo-700"
@@ -189,7 +206,27 @@ export default function FinalOutput({
         </button>
       </div>
 
-      {/* Vercel Token Section */}
+      {showPreview && previewHtml && (
+        <div className="mb-6 overflow-hidden rounded-xl border border-zinc-200 shadow-lg dark:border-zinc-700">
+          <div className="flex items-center justify-between bg-zinc-100 px-4 py-2 dark:bg-zinc-800">
+            <span className="text-sm font-medium text-zinc-600 dark:text-zinc-300">
+              Live Preview
+            </span>
+            <div className="flex gap-1.5">
+              <span className="h-3 w-3 rounded-full bg-red-400" />
+              <span className="h-3 w-3 rounded-full bg-yellow-400" />
+              <span className="h-3 w-3 rounded-full bg-green-400" />
+            </div>
+          </div>
+          <iframe
+            srcDoc={previewHtml}
+            className="h-[600px] w-full border-0 bg-white"
+            sandbox="allow-scripts allow-forms allow-modals"
+            title="App Preview"
+          />
+        </div>
+      )}
+
       <div className="mb-6 flex justify-center">
         {hasVercelToken ? (
           <div className="inline-flex items-center gap-1.5 rounded-lg border border-green-200 bg-green-50 px-3 py-2 text-sm font-medium text-green-700 dark:border-green-800 dark:bg-green-950/50 dark:text-green-400">
@@ -231,7 +268,6 @@ export default function FinalOutput({
         )}
       </div>
 
-      {/* Deploy Status */}
       {deployState === "success" && deployUrl && (
         <div className="mb-6 rounded-xl border border-green-200 bg-green-50 p-6 text-center dark:border-green-800 dark:bg-green-950/50">
           <div className="mb-2 flex items-center justify-center gap-2 text-green-700 dark:text-green-400">

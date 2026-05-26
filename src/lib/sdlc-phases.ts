@@ -52,14 +52,40 @@ export const SDLC_PHASES: SDLCPhase[] = [
     description:
       "Generate the actual application code based on all previous phases.",
     icon: "Code",
-    prompt: `Generate code. Format per file:
+    prompt: `You are an expert frontend developer. Generate a COMPLETE, FULLY WORKING, SINGLE-FILE web application as one index.html file.
 
-### FILE: \`path/to/file\`
-\`\`\`lang
-code
+CRITICAL RULES — you MUST follow every one:
+
+1. **Output EXACTLY ONE file** named index.html. All CSS and JavaScript MUST be inline (inside <style> and <script> tags). Do NOT reference any external files.
+
+2. **The app MUST be fully functional.** All buttons, forms, inputs, navigation, and interactive elements MUST work. Wire up every event handler. Implement actual logic — not placeholders, not TODO comments, not "coming soon".
+
+3. **Use stunning, modern UI design:**
+   - Use a sophisticated color palette with gradients (e.g., linear-gradient with indigo/purple/blue tones)
+   - Add smooth CSS transitions and subtle animations (hover effects, fade-ins, slide-ins)
+   - Use CSS Grid and Flexbox for pixel-perfect responsive layouts
+   - Include box-shadows, rounded corners (border-radius), and modern spacing
+   - Use a clean sans-serif font stack: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif
+   - Ensure mobile responsive design with @media queries
+   - Add a polished header/nav bar with the app name
+   - Include proper form styling with focus states and validation feedback
+   - Use icon entities or simple SVG icons where appropriate
+
+4. **Data persistence:** Use localStorage to save and load data so the app works across page refreshes.
+
+5. **Structure your code cleanly:** Use well-named functions, clear variable names, and organized sections in the HTML.
+
+6. **Output format — use EXACTLY this:**
+
+### FILE: \`index.html\`
+\`\`\`html
+<!DOCTYPE html>
+<html lang="en">
+...complete working code here...
+</html>
 \`\`\`
 
-Include config, entry points, models, routes, UI. No explanations.`,
+Do NOT output multiple files. Do NOT add any explanation text before or after the code. Do NOT use markdown outside the file block. The ENTIRE application must be in this single index.html file.`,
   },
   {
     id: "testing-strategy",
