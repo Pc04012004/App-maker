@@ -3,6 +3,7 @@
 import { useState, useCallback } from "react";
 import { SDLC_PHASES } from "@/lib/sdlc-phases";
 import { PhaseResult, SDLCRequest, SDLCResponse } from "@/lib/types";
+import { extractFilesFromContent } from "@/lib/file-extraction";
 import PhaseNavigation from "./PhaseNavigation";
 import PhasePanel from "./PhasePanel";
 import FinalOutput from "./FinalOutput";
@@ -15,6 +16,8 @@ interface SDLCWizardProps {
   apiKey: string;
   onBack: () => void;
 }
+
+const CLIENT_RETRIES = 2;
 
 export default function SDLCWizard({
   requirementDocument,
@@ -41,41 +44,66 @@ export default function SDLCWizard({
       apiKey,
     };
 
-    try {
-      const response = await fetch("/api/sdlc", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(requestBody),
-      });
+    for (let attempt = 0; attempt <= CLIENT_RETRIES; attempt++) {
+      try {
+        const response = await fetch("/api/sdlc", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(requestBody),
+        });
 
-      const data = (await response.json()) as SDLCResponse;
+        const data = (await response.json()) as SDLCResponse;
 
-      if (!response.ok || data.error) {
-        setError(data.error ?? "An unexpected error occurred.");
+        if (!response.ok || data.error) {
+          if (attempt < CLIENT_RETRIES && response.status >= 500) {
+            await new Promise((r) => setTimeout(r, 2000 * (attempt + 1)));
+            continue;
+          }
+          setError(data.error ?? "An unexpected error occurred.");
+          setIsProcessing(false);
+          return;
+        }
+
+        if (!data.content || !data.content.trim()) {
+          if (attempt < CLIENT_RETRIES) {
+            await new Promise((r) => setTimeout(r, 1500));
+            continue;
+          }
+          setError("AI returned an empty response. Please try again.");
+          setIsProcessing(false);
+          return;
+        }
+
+        const newResult: PhaseResult = {
+          phaseId: phase.id,
+          content: data.content,
+          approved: false,
+        };
+
+        setPhases((prev) => {
+          const existing = prev.findIndex((p) => p.phaseId === phase.id);
+          if (existing >= 0) {
+            const updated = [...prev];
+            updated[existing] = newResult;
+            return updated;
+          }
+          return [...prev, newResult];
+        });
+
+        setIsProcessing(false);
+        return;
+      } catch {
+        if (attempt < CLIENT_RETRIES) {
+          await new Promise((r) => setTimeout(r, 2000 * (attempt + 1)));
+          continue;
+        }
+        setError("Failed to connect to the server. Please try again.");
         setIsProcessing(false);
         return;
       }
-
-      const newResult: PhaseResult = {
-        phaseId: phase.id,
-        content: data.content,
-        approved: false,
-      };
-
-      setPhases((prev) => {
-        const existing = prev.findIndex((p) => p.phaseId === phase.id);
-        if (existing >= 0) {
-          const updated = [...prev];
-          updated[existing] = newResult;
-          return updated;
-        }
-        return [...prev, newResult];
-      });
-    } catch {
-      setError("Failed to connect to the server. Please try again.");
-    } finally {
-      setIsProcessing(false);
     }
+
+    setIsProcessing(false);
   }, [currentPhaseIndex, phases, requirementDocument, apiKey]);
 
   const approvePhase = useCallback(
@@ -132,12 +160,9 @@ export default function SDLCWizard({
       const codeContent = codePhase.editedContent ?? codePhase.content;
       const codeFolder = zip.folder("generated-code");
       if (codeFolder) {
-        const fileRegex = /### FILE: `(.+?)`\s*\n```[\w]*\n([\s\S]*?)```/g;
-        let match;
-        while ((match = fileRegex.exec(codeContent)) !== null) {
-          const filePath = match[1];
-          const fileContent = match[2];
-          codeFolder.file(filePath, fileContent);
+        const extractedFiles = extractFilesFromContent(codeContent);
+        for (const file of extractedFiles) {
+          codeFolder.file(file.path, file.content);
         }
       }
     }
