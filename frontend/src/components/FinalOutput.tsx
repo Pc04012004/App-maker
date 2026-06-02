@@ -25,6 +25,7 @@ import MarkdownRenderer from "./MarkdownRenderer";
 interface FinalOutputProps {
   phases: PhaseResult[];
   onDownload: () => void;
+  onReviewDocuments: () => void;
   onStartNew: () => void;
 }
 
@@ -38,6 +39,7 @@ interface DeployFile {
 export default function FinalOutput({
   phases,
   onDownload,
+  onReviewDocuments,
   onStartNew,
 }: FinalOutputProps) {
   const [expandedPhases, setExpandedPhases] = useState<Set<string>>(new Set());
@@ -109,6 +111,14 @@ export default function FinalOutput({
       return;
     }
 
+    if (!hasVercelToken && !vercelToken.trim()) {
+      setDeployError(
+        "Enter a Vercel API token to deploy, or set VERCEL_TOKEN in the root .env file."
+      );
+      setDeployState("error");
+      return;
+    }
+
     setDeployState("deploying");
     setDeployError(null);
 
@@ -119,17 +129,22 @@ export default function FinalOutput({
         body: JSON.stringify({
           files,
           projectName: "sdlc-generated-app",
-          vercelToken: vercelToken || undefined,
+          vercelToken: vercelToken.trim() || undefined,
         }),
       });
 
-      const data = (await response.json()) as {
-        url?: string;
-        error?: string;
-      };
+      const responseText = await response.text();
+      let data: { url?: string; error?: string; detail?: string } = {};
+      try {
+        data = responseText ? (JSON.parse(responseText) as typeof data) : {};
+      } catch {
+        data = {};
+      }
 
-      if (!response.ok || data.error) {
-        setDeployError(data.error ?? "Deployment failed.");
+      if (!response.ok || data.error || data.detail) {
+        setDeployError(
+          data.error ?? data.detail ?? responseText.trim() ?? "Deployment failed."
+        );
         setDeployState("error");
         return;
       }
@@ -137,10 +152,12 @@ export default function FinalOutput({
       setDeployUrl(data.url ?? null);
       setDeployState("success");
     } catch {
-      setDeployError("Failed to connect to the deployment server.");
+      setDeployError(
+        "Failed to connect to the deployment server. Check that the backend is running."
+      );
       setDeployState("error");
     }
-  }, [extractFiles, vercelToken]);
+  }, [extractFiles, hasVercelToken, vercelToken]);
 
   return (
     <div className="mx-auto w-full max-w-5xl">
@@ -175,6 +192,13 @@ export default function FinalOutput({
           </button>
         )}
         <button
+          onClick={onReviewDocuments}
+          className="inline-flex items-center gap-2 rounded-lg border border-zinc-300 bg-white px-6 py-3 text-sm font-medium text-zinc-700 shadow-sm transition-colors hover:bg-zinc-50 dark:border-zinc-600 dark:bg-zinc-800 dark:text-zinc-300 dark:hover:bg-zinc-700"
+        >
+          <ChevronRight className="h-4 w-4" />
+          Review Documents
+        </button>
+        <button
           onClick={onDownload}
           className="inline-flex items-center gap-2 rounded-lg bg-indigo-600 px-6 py-3 text-sm font-medium text-white shadow-sm transition-colors hover:bg-indigo-700"
         >
@@ -183,7 +207,7 @@ export default function FinalOutput({
         </button>
         <button
           onClick={handleDeploy}
-          disabled={deployState === "deploying"}
+          disabled={deployState === "deploying" || (!hasVercelToken && !vercelToken.trim())}
           className="inline-flex items-center gap-2 rounded-lg bg-green-600 px-6 py-3 text-sm font-medium text-white shadow-sm transition-colors hover:bg-green-700 disabled:cursor-not-allowed disabled:opacity-50"
         >
           {deployState === "deploying" ? (
@@ -195,7 +219,9 @@ export default function FinalOutput({
             ? "Deploying..."
             : deployState === "success"
               ? "Deployed!"
-              : "Deploy to Vercel"}
+              : !hasVercelToken && !vercelToken.trim()
+                ? "Set Vercel Token to Deploy"
+                : "Deploy to Vercel"}
         </button>
         <button
           onClick={onStartNew}

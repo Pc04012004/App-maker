@@ -1,36 +1,52 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# SDLCFlow
+
+This project is split into a React frontend and a Python backend.
+
+- `frontend/` contains the Next.js app.
+- `backend/` contains the FastAPI service for Groq and Vercel integration.
 
 ## Getting Started
 
-First, run the development server:
+1. Install and run the frontend:
+
+```bash
+cd frontend
+npm install
+npm run dev
+```
+
+2. In another terminal, start the Python backend:
+
+```bash
+cd ..
+python3 -m uvicorn backend.app.main:app --reload --host 0.0.0.0 --port 8000
+```
+
+If you prefer, you can also use the root wrapper scripts:
 
 ```bash
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+npm run backend:dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Open [http://localhost:3000](http://localhost:3000) after both services are running.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Environment
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+Paste your API values into the root `.env` file. `frontend/.env.local.example`
+is kept only as a reference for deployments that prefer frontend-local env
+files.
 
-## Learn More
+The backend and frontend rewrite layer load:
 
-To learn more about Next.js, take a look at the following resources:
+- `GROQ_API_KEY`
+- `VERCEL_TOKEN`
+- `BACKEND_URL` for API rewrites
+- `GROQ_API_URL` and `VERCEL_DEPLOY_API_URL` for external API endpoints
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## Structure
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+- `frontend/src/app` - frontend pages and layout
+- `frontend/src/components` - React UI components
+- `frontend/src/lib` - shared frontend helpers
+- `backend/app` - FastAPI app, schemas, and SDLC phase definitions

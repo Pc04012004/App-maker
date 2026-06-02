@@ -52,14 +52,14 @@ export default function SDLCWizard({
           body: JSON.stringify(requestBody),
         });
 
-        const data = (await response.json()) as SDLCResponse;
+        const data = (await response.json()) as SDLCResponse & { detail?: string };
 
-        if (!response.ok || data.error) {
+        if (!response.ok || data.error || data.detail) {
           if (attempt < CLIENT_RETRIES && response.status >= 500) {
             await new Promise((r) => setTimeout(r, 2000 * (attempt + 1)));
             continue;
           }
-          setError(data.error ?? "An unexpected error occurred.");
+          setError(data.error ?? data.detail ?? "An unexpected error occurred.");
           setIsProcessing(false);
           return;
         }
@@ -135,6 +135,30 @@ export default function SDLCWizard({
     generatePhase();
   }, [generatePhase]);
 
+  const handleSelectPhase = useCallback(
+    (phaseIndex: number) => {
+      const phase = SDLC_PHASES[phaseIndex];
+      const hasContent = phases.some((result) => result.phaseId === phase.id);
+      if (!phase || !hasContent) {
+        return;
+      }
+
+      setCurrentPhaseIndex(phaseIndex);
+      setIsComplete(false);
+      setError(null);
+      setIsProcessing(false);
+    },
+    [phases]
+  );
+
+  const handleReviewDocuments = useCallback(() => {
+    if (phases.length === 0) return;
+    setIsComplete(false);
+    setCurrentPhaseIndex(SDLC_PHASES.length - 1);
+    setError(null);
+    setIsProcessing(false);
+  }, [phases.length]);
+
   const handleDownload = useCallback(async () => {
     const zip = new JSZip();
     const docs = zip.folder("sdlc-output");
@@ -180,6 +204,7 @@ export default function SDLCWizard({
       <FinalOutput
         phases={phases}
         onDownload={handleDownload}
+        onReviewDocuments={handleReviewDocuments}
         onStartNew={onBack}
       />
     );
@@ -202,6 +227,7 @@ export default function SDLCWizard({
           currentPhaseIndex={currentPhaseIndex}
           phases={phases}
           isProcessing={isProcessing}
+          onSelectPhase={handleSelectPhase}
         />
       </div>
 

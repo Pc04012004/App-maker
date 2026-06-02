@@ -28,12 +28,14 @@ interface PhaseNavigationProps {
   currentPhaseIndex: number;
   phases: PhaseResult[];
   isProcessing: boolean;
+  onSelectPhase?: (phaseIndex: number) => void;
 }
 
 export default function PhaseNavigation({
   currentPhaseIndex,
   phases,
   isProcessing,
+  onSelectPhase,
 }: PhaseNavigationProps) {
   return (
     <nav className="w-full overflow-x-auto">
@@ -44,6 +46,8 @@ export default function PhaseNavigation({
           const isActive = index === currentPhaseIndex;
           const isCompleted = phaseResult?.approved;
           const isCurrent = isActive && isProcessing;
+          const isSelectable =
+            Boolean(onSelectPhase) && (Boolean(phaseResult) || index <= currentPhaseIndex);
 
           let statusClasses =
             "border-zinc-200 bg-white text-zinc-400 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-500";
@@ -57,8 +61,13 @@ export default function PhaseNavigation({
 
           return (
             <li key={phase.id} className="flex items-center">
-              <div
-                className={`flex items-center gap-2 rounded-lg border px-3 py-2 text-xs font-medium transition-all ${statusClasses}`}
+              <button
+                type="button"
+                onClick={() => onSelectPhase?.(index)}
+                disabled={!isSelectable}
+                className={`flex items-center gap-2 rounded-lg border px-3 py-2 text-xs font-medium transition-all ${
+                  isSelectable ? "cursor-pointer hover:shadow-sm" : "cursor-default"
+                } ${statusClasses}`}
               >
                 <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full">
                   {isCurrent ? (
@@ -72,7 +81,7 @@ export default function PhaseNavigation({
                 <span className="hidden whitespace-nowrap sm:inline">
                   {phase.name}
                 </span>
-              </div>
+              </button>
               {index < SDLC_PHASES.length - 1 && (
                 <div
                   className={`mx-1 h-px w-4 ${

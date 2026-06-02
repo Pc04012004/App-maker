@@ -12,13 +12,15 @@ export default function RequirementInput({ onSubmit }: RequirementInputProps) {
   const [apiKey, setApiKey] = useState("");
   const [showApiKey, setShowApiKey] = useState(false);
   const [hasEnvKey, setHasEnvKey] = useState(false);
+  const [hasVercelToken, setHasVercelToken] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     fetch("/api/config")
       .then((res) => res.json())
-      .then((data: { hasApiKey: boolean }) => {
+      .then((data: { hasApiKey: boolean; hasVercelToken: boolean }) => {
         setHasEnvKey(data.hasApiKey);
+        setHasVercelToken(data.hasVercelToken);
       })
       .catch(() => {
         /* ignore */
@@ -103,7 +105,7 @@ The platform should handle 10,000 concurrent users and comply with GDPR...`}
           </p>
         </div>
 
-        <div className="mb-6">
+        <div className="mb-6 space-y-3">
           {hasEnvKey ? (
             <div className="inline-flex items-center gap-1.5 rounded-lg border border-green-200 bg-green-50 px-3 py-2 text-sm font-medium text-green-700 dark:border-green-800 dark:bg-green-950/50 dark:text-green-400">
               <CheckCircle className="h-4 w-4" />
@@ -134,6 +136,15 @@ The platform should handle 10,000 concurrent users and comply with GDPR...`}
                 </div>
               )}
             </>
+          )}
+
+          {hasVercelToken && (
+            <div className="block">
+              <div className="inline-flex items-center gap-1.5 rounded-lg border border-green-200 bg-green-50 px-3 py-2 text-sm font-medium text-green-700 dark:border-green-800 dark:bg-green-950/50 dark:text-green-400">
+                <CheckCircle className="h-4 w-4" />
+                Vercel token configured via environment
+              </div>
+            </div>
           )}
         </div>
 
